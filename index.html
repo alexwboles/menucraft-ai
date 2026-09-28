@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MenuCraft AI — Menus that sell, margins that hold</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🍽️ MenuCraft <span>AI</span></div>
+  <nav>
+    <button data-view="dishes" class="active">Dishes</button>
+    <button data-view="menu">Menu preview</button>
+    <button data-view="specials">Weekend specials</button>
+  </nav>
+</header>
+
+<main>
+  <!-- DISHES VIEW -->
+  <section id="view-dishes" class="view">
+    <div class="grid">
+      <div class="card">
+        <h2>Add a dish</h2>
+        <label>Dish name <input id="dishName" placeholder="Margherita Pizza"></label>
+        <label>Category
+          <select id="dishCat">
+            <option value="starter">Starter</option>
+            <option value="main" selected>Main</option>
+            <option value="side">Side</option>
+            <option value="dessert">Dessert</option>
+            <option value="drink">Drink</option>
+          </select>
+        </label>
+        <div id="ingRows"></div>
+        <button id="addIng" class="ghost">+ ingredient</button>
+        <label>Menu price ($) <input id="dishPrice" type="number" step="0.01" min="0" placeholder="16.00"></label>
+        <label>Target margin % <input id="targetMargin" type="number" min="10" max="95" value="70"></label>
+        <button id="saveDish" class="primary">Save dish</button>
+      </div>
+      <div class="card">
+        <h2>Your dishes</h2>
+        <div id="dishList" class="dish-list"><p class="muted">No dishes yet — add your first above.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MENU PREVIEW VIEW -->
+  <section id="view-menu" class="view hidden">
+    <div class="card menu-sheet">
+      <div class="menu-head">
+        <input id="bizName" class="biz-name" placeholder="Your Restaurant Name" value="">
+        <p class="muted">Crafted with MenuCraft AI</p>
+      </div>
+      <div id="menuBody"></div>
+      <div class="menu-actions no-print">
+        <button id="printMenu" class="primary">🖨️ Print menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPECIALS VIEW -->
+  <section id="view-specials" class="view hidden">
+    <div class="card">
+      <h2>Weekend specials</h2>
+      <p class="muted">Generated from your dishes — one friendly combo price each.</p>
+      <button id="genSpecials" class="primary">✨ Generate specials</button>
+      <div id="specialList"></div>
+    </div>
+  </section>
+</main>
+
+<!-- DISH DETAIL MODAL -->
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <button id="closeModal" class="ghost right">✕</button>
+    <h2 id="mTitle"></h2>
+    <div id="mCost"></div>
+    <h3>AI descriptions <span class="muted small">(editable — click to copy)</span></h3>
+    <div id="mDesc"></div>
+    <h3>Margin health</h3>
+    <div id="mHealth"></div>
+  </div>
+</div>
+
+<script src="lib/logic.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
