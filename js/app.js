@@ -73,7 +73,7 @@
     if (!dishes.length) { box.innerHTML = '<p class="muted">No dishes yet — add your first above.</p>'; return; }
     box.innerHTML = '';
     dishes.forEach(function (d) {
-      var h = M.marginHealth(d, d.price, d.targetMargin);
+      var h = M.marginHealth(d, d.price, d.targetMargin || 70);
       var row = document.createElement('div');
       row.className = 'dish-row';
       row.innerHTML =
@@ -99,10 +99,11 @@
     if (!d) return;
     document.getElementById('mTitle').textContent = d.name + ' (' + d.category + ')';
     var cost = M.computePlateCost(d);
-    var suggested = M.suggestPrice(cost, d.targetMargin);
+    var tm = d.targetMargin || 70;
+    var suggested = M.suggestPrice(cost, tm);
     document.getElementById('mCost').innerHTML =
       '<p>Plate cost: <strong>' + money(cost) + '</strong> · Your price: <strong>' + money(d.price) + '</strong><br>' +
-      '<span class="muted">Suggested price at ' + d.targetMargin + '% margin: <strong>' + money(suggested) + '</strong></span></p>';
+      '<span class="muted">Suggested price at ' + tm + '% margin: <strong>' + money(suggested) + '</strong></span></p>';
     var descs = M.generateDescriptions(d);
     var dbox = document.getElementById('mDesc');
     dbox.innerHTML = '';
@@ -118,7 +119,7 @@
       });
       dbox.appendChild(c);
     });
-    var h = M.marginHealth(d, d.price, d.targetMargin);
+    var h = M.marginHealth(d, d.price, d.targetMargin || 70);
     document.getElementById('mHealth').innerHTML =
       '<div class="health-box ' + h.status + '"><span class="flag ' + h.status + '">' +
       h.status.toUpperCase() + '</span><p>' + esc(h.message) + '</p></div>';
