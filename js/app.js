@@ -40,7 +40,20 @@
   document.getElementById('addIng').addEventListener('click', function () { addIngRow('', ''); });
   addIngRow('', ''); addIngRow('', '');
 
-  // ---------- save dish ----------
+  // ---------- save / edit dish ----------
+  var editingId = null;
+
+  function resetComposer() {
+    editingId = null;
+    document.getElementById('dishName').value = '';
+    document.getElementById('dishPrice').value = '';
+    document.getElementById('dishCat').value = 'main';
+    document.getElementById('targetMargin').value = '70';
+    ingRows.innerHTML = ''; addIngRow('', ''); addIngRow('', '');
+    document.getElementById('saveDish').textContent = 'Save dish';
+    document.getElementById('cancelEdit').style.display = 'none';
+  }
+
   document.getElementById('saveDish').addEventListener('click', function () {
     var name = document.getElementById('dishName').value.trim();
     if (!name) { alert('Give the dish a name first.'); return; }
@@ -51,28 +64,75 @@
       if (n) ingredients.push({ name: n, cost: isNaN(c) ? 0 : c });
     });
     var dishes = load();
-    dishes.push({
-      id: 'd' + Date.now(),
+    var record = {
       name: name,
       category: document.getElementById('dishCat').value,
       ingredients: ingredients,
       price: parseFloat(document.getElementById('dishPrice').value) || 0,
       targetMargin: parseFloat(document.getElementById('targetMargin').value) || 70
-    });
+    };
+    if (editingId) {
+      var existing = dishes.find(function (x) { return x.id === editingId; });
+      if (existing) {
+        existing.name = record.name; existing.category = record.category;
+        existing.ingredients = record.ingredients; existing.price = record.price;
+        existing.targetMargin = record.targetMargin;
+      }
+    } else {
+      record.id = 'd' + Date.now();
+      dishes.push(record);
+    }
     save(dishes);
-    document.getElementById('dishName').value = '';
-    document.getElementById('dishPrice').value = '';
-    ingRows.innerHTML = ''; addIngRow('', ''); addIngRow('', '');
+    resetComposer();
     renderList();
   });
+  document.getElementById('cancelEdit').addEventListener('click', resetComposer);
+
+  function startEdit(id) {
+    var d = load().find(function (x) { return x.id === id; });
+    if (!d) return;
+    editingId = id;
+    document.getElementById('dishName').value = d.name;
+    document.getElementById('dishCat').value = d.category;
+    document.getElementById('dishPrice').value = d.price || '';
+    document.getElementById('targetMargin').value = d.targetMargin || 70;
+    ingRows.innerHTML = '';
+    (d.ingredients || []).forEach(function (i) { addIngRow(i.name, i.cost); });
+    if (!d.ingredients || !d.ingredients.length) { addIngRow('', ''); addIngRow('', ''); }
+    document.getElementById('saveDish').textContent = 'Update dish';
+    document.getElementById('cancelEdit').style.display = '';
+    document.querySelector('.composer').scrollIntoView({ behavior: 'smooth' });
+  }
 
   // ---------- dish list ----------
+  var dishSearch = '', dishCatFilter = 'all', dishSort = 'newest';
+
+  function downloadFile(filename, text, mime) {
+    var blob = new Blob([text], { type: mime });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  }
+
   function renderList() {
     var dishes = load();
     var box = document.getElementById('dishList');
     if (!dishes.length) { box.innerHTML = '<p class="muted">No dishes yet — add your first above.</p>'; return; }
+    var visible = M.sortDishes(
+      M.searchDishes(dishes, dishSearch).filter(function (d) {
+        return dishCatFilter === 'all' || d.category === dishCatFilter;
+      }),
+      dishSort
+    );
+    if (!visible.length) {
+      box.innerHTML = '<p class="muted">No dishes match your search / filter.</p>';
+      return;
+    }
     box.innerHTML = '';
-    dishes.forEach(function (d) {
+    visible.forEach(function (d) {
       var h = M.marginHealth(d, d.price, d.targetMargin || 70);
       var row = document.createElement('div');
       row.className = 'dish-row';
@@ -80,14 +140,40 @@
         '<div><span class="dot ' + h.status + '"></span><strong>' + esc(d.name) + '</strong> ' +
         '<span class="cat">' + esc(d.category) + '</span><br>' +
         '<span class="muted small">cost ' + money(h.cost) + ' · price ' + money(d.price) + ' · margin ' + h.margin + '%</span></div>' +
-        '<div><button class="ghost">Open</button> <button class="ghost del">Delete</button></div>';
-      row.querySelector('.ghost:not(.del)').addEventListener('click', function () { openDish(d.id); });
+        '<div><button class="ghost">Open</button> <button class="ghost edit">Edit</button> ' +
+        '<button class="ghost dup">Duplicate</button> <button class="ghost del">Delete</button></div>';
+      row.querySelector('.ghost:not(.del):not(.edit):not(.dup)').addEventListener('click', function () { openDish(d.id); });
+      row.querySelector('.edit').addEventListener('click', function () { startEdit(d.id); });
+      row.querySelector('.dup').addEventListener('click', function () {
+        var all = load();
+        all.push(M.duplicateDish(d));
+        save(all);
+        renderList();
+      });
       row.querySelector('.del').addEventListener('click', function () {
         if (confirm('Delete "' + d.name + '"?')) { save(load().filter(function (x) { return x.id !== d.id; })); renderList(); }
       });
       box.appendChild(row);
     });
   }
+
+  document.getElementById('dishSearch').addEventListener('input', function (e) {
+    dishSearch = e.target.value;
+    renderList();
+  });
+  document.getElementById('dishCatFilter').addEventListener('change', function (e) {
+    dishCatFilter = e.target.value;
+    renderList();
+  });
+  document.getElementById('dishSort').addEventListener('change', function (e) {
+    dishSort = e.target.value;
+    renderList();
+  });
+  document.getElementById('dishCsvBtn').addEventListener('click', function () {
+    var dishes = load();
+    if (!dishes.length) { alert('No dishes to export yet.'); return; }
+    downloadFile('menucraft-menu.csv', M.menuToCSV(dishes), 'text/csv;charset=utf-8');
+  });
 
   // ---------- dish modal ----------
   var modal = document.getElementById('modal');

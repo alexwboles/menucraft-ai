@@ -50,11 +50,31 @@
           <label>Menu price ($) <input id="dishPrice" type="number" step="0.01" min="0" placeholder="16.00"></label>
           <label>Target margin % <input id="targetMargin" type="number" min="10" max="95" value="70"></label>
         </div>
-        <button id="saveDish" class="primary">Save dish</button>
+        <div class="duo">
+          <button id="saveDish" class="primary">Save dish</button>
+          <button id="cancelEdit" class="ghost" style="display:none">Cancel edit</button>
+        </div>
       </div>
       <div class="card">
         <p class="kicker">The lineup</p>
         <h2>Your dishes</h2>
+        <div class="dish-toolbar">
+          <input id="dishSearch" type="search" placeholder="Search dishes or ingredients…" aria-label="Search dishes">
+          <select id="dishCatFilter" aria-label="Filter by category">
+            <option value="all">All categories</option>
+            <option value="starter">Starters</option>
+            <option value="main">Mains</option>
+            <option value="side">Sides</option>
+            <option value="dessert">Desserts</option>
+            <option value="drink">Drinks</option>
+          </select>
+          <select id="dishSort" aria-label="Sort dishes">
+            <option value="newest">Newest first</option>
+            <option value="margin">Worst margin first</option>
+            <option value="name">Name A–Z</option>
+          </select>
+          <button id="dishCsvBtn" class="ghost">Export CSV</button>
+        </div>
         <div id="dishList" class="dish-list"><p class="muted">No dishes yet — add your first above.</p></div>
       </div>
     </div>

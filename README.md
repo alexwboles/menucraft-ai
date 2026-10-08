@@ -15,6 +15,7 @@ Type in a dish with its ingredients and what each costs. MenuCraft AI:
    - 🔴 Losing money — rework before it goes on the menu
 3. **Previews an elegant printable menu** grouped by course, ready for the printer (Print button → clean print CSS).
 4. **Generates weekend specials** — combos from your existing dishes with a friendly combo price.
+5. **Manages the lineup** — edit any dish (prefilled composer), duplicate dishes, search by name or ingredient, filter by category, sort worst-margin-first to spot the losers, and export the full menu with cost/margin columns to CSV.
 
 Everything runs **locally in the browser** (localStorage). No account, no network, no fees. If you set `OPENAI_API_KEY`, descriptions can optionally be polished by a model — never required.
 
