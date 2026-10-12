@@ -89,7 +89,7 @@ eq(mains.length, 2, 'flow9 category filter keeps 2 mains');
 // FLOW 10: CSV export carries every dish with margin columns
 var csv = M.menuToCSV(fullMenu);
 var cl = csv.split('\n');
-eq(cl[0], 'name,category,cost,price,margin_pct,target_margin_pct,status', 'flow10 header');
+eq(cl[0], 'name,category,cost,price,margin_pct,target_margin_pct,status,allergens', 'flow10 header');
 eq(cl.length, 5, 'flow10 one row per dish');
 t(cl[3].indexOf('Lobster Thermidor,main,17.50,24.00,27.1,70,red') === 0, 'flow10 lobster row: ' + cl[3]);
 

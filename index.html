@@ -45,6 +45,7 @@
           </select>
         </label>
         <div id="ingRows"></div>
+        <datalist id="ingLib"></datalist>
         <button id="addIng" class="ghost">+ ingredient</button>
         <div class="duo">
           <label>Menu price ($) <input id="dishPrice" type="number" step="0.01" min="0" placeholder="16.00"></label>
@@ -90,6 +91,18 @@
       </div>
       <div id="menuBody"></div>
       <div class="menu-foot" aria-hidden="true">❦</div>
+      <div class="menu-controls no-print">
+        <label>Description voice
+          <select id="menuVoice">
+            <option value="upscale" selected>Upscale</option>
+            <option value="casual">Casual</option>
+            <option value="fun">Fun</option>
+            <option value="none">None (name + price only)</option>
+          </select>
+        </label>
+        <label class="chk"><input type="checkbox" id="menuPrices" checked> Show prices</label>
+        <label class="chk"><input type="checkbox" id="menuAllergens" checked> Show allergen badges</label>
+      </div>
       <div class="menu-actions no-print">
         <button id="printMenu" class="primary">Print menu</button>
       </div>
@@ -118,6 +131,9 @@
     <div id="mDesc"></div>
     <h3>Margin health</h3>
     <div id="mHealth"></div>
+    <h3>Allergens</h3>
+    <p class="muted small">Tick every major allergen present in this dish — they'll print as badges on the menu.</p>
+    <div id="mAllergens"></div>
   </div>
 </div>
 

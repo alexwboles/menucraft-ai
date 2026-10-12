@@ -28,12 +28,38 @@
 
   // ---------- ingredient rows ----------
   var ingRows = document.getElementById('ingRows');
+  var ingLibList = document.getElementById('ingLib');
+
+  // Refresh the shared ingredient-cost pantry from saved dishes.
+  function refreshIngLibrary() {
+    if (!ingLibList) return;
+    var lib = M.ingredientLibrary(load());
+    var names = Object.keys(lib).sort(function (a, b) {
+      return lib[a].name.toLowerCase().localeCompare(lib[b].name.toLowerCase());
+    });
+    ingLibList.innerHTML = '';
+    names.forEach(function (k) {
+      var o = document.createElement('option');
+      o.value = lib[k].name;
+      o.label = '$' + lib[k].cost.toFixed(2);
+      o.textContent = lib[k].name + ' — $' + lib[k].cost.toFixed(2);
+      ingLibList.appendChild(o);
+    });
+  }
+
   function addIngRow(name, cost) {
     var div = document.createElement('div');
     div.className = 'ing-row';
-    div.innerHTML = '<input placeholder="Ingredient" value="' + esc(name || '') + '">' +
+    div.innerHTML = '<input placeholder="Ingredient" list="ingLib" value="' + esc(name || '') + '">' +
       '<input type="number" step="0.01" min="0" placeholder="$ cost" value="' + esc(cost == null ? '' : cost) + '">' +
       '<button title="remove">×</button>';
+    var ins = div.querySelectorAll('input');
+    // Autofill the cost from the pantry when the cook picks a known ingredient.
+    ins[0].addEventListener('change', function () {
+      if (ins[1].value !== '' && parseFloat(ins[1].value) > 0) return;
+      var hit = M.ingredientLibrary(load())[ins[0].value.trim().toLowerCase()];
+      if (hit) ins[1].value = hit.cost.toFixed(2);
+    });
     div.querySelector('button').addEventListener('click', function () { div.remove(); });
     ingRows.appendChild(div);
   }
@@ -85,6 +111,7 @@
     save(dishes);
     resetComposer();
     renderList();
+    refreshIngLibrary();
   });
   document.getElementById('cancelEdit').addEventListener('click', resetComposer);
 
@@ -134,12 +161,19 @@
     box.innerHTML = '';
     visible.forEach(function (d) {
       var h = M.marginHealth(d, d.price, d.targetMargin || 70);
+      var allergens = M.dishAllergens(d);
+      var algBadges = allergens.length
+        ? '<span class="alg-row">' + allergens.map(function (a) {
+            return '<span class="alg" title="' + esc(M.allergenLabel(a)) + '">' + esc(M.allergenLabel(a)) + '</span>';
+          }).join('') + '</span>'
+        : '';
       var row = document.createElement('div');
       row.className = 'dish-row';
       row.innerHTML =
         '<div><span class="dot ' + h.status + '"></span><strong>' + esc(d.name) + '</strong> ' +
         '<span class="cat">' + esc(d.category) + '</span><br>' +
-        '<span class="muted small">cost ' + money(h.cost) + ' · price ' + money(d.price) + ' · margin ' + h.margin + '%</span></div>' +
+        '<span class="muted small">cost ' + money(h.cost) + ' · price ' + money(d.price) + ' · margin ' + h.margin + '%</span>' +
+        algBadges + '</div>' +
         '<div><button class="ghost">Open</button> <button class="ghost edit">Edit</button> ' +
         '<button class="ghost dup">Duplicate</button> <button class="ghost del">Delete</button></div>';
       row.querySelector('.ghost:not(.del):not(.edit):not(.dup)').addEventListener('click', function () { openDish(d.id); });
@@ -209,27 +243,46 @@
     document.getElementById('mHealth').innerHTML =
       '<div class="health-box ' + h.status + '"><span class="flag ' + h.status + '">' +
       h.status.toUpperCase() + '</span><p>' + esc(h.message) + '</p></div>';
+
+    // allergen editor
+    var cur = M.dishAllergens(d);
+    var abox = document.getElementById('mAllergens');
+    abox.innerHTML = '<div class="alg-grid">' + M.MAJOR_ALLERGENS.map(function (a) {
+      return '<label class="alg-pick"><input type="checkbox" value="' + esc(a.id) + '"' +
+        (cur.indexOf(a.id) >= 0 ? ' checked' : '') + '> ' + esc(a.name) + '</label>';
+    }).join('') + '</div>' +
+      '<button id="saveAllergens" class="ghost" style="margin-top:8px">Save allergens</button>';
+    document.getElementById('saveAllergens').addEventListener('click', function () {
+      var ids = [];
+      abox.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) { ids.push(cb.value); });
+      var all = load();
+      var rec = all.find(function (x) { return x.id === id; });
+      if (rec) { M.setDishAllergens(rec, ids); save(all); renderList(); }
+      modal.classList.add('hidden');
+    });
+
     modal.classList.remove('hidden');
   }
 
   // ---------- menu preview ----------
-  var CAT_ORDER = ['starter', 'main', 'side', 'dessert', 'drink'];
+  var menuOpts = { voice: 'upscale', showPrices: true, showAllergens: true };
   function renderMenu() {
     var dishes = load();
     var body = document.getElementById('menuBody');
     var biz = document.getElementById('bizName').value.trim();
     if (!dishes.length) { body.innerHTML = '<p class="muted">Add dishes to see your menu here.</p>'; return; }
-    var descs = {};
-    dishes.forEach(function (d) { descs[d.id] = M.generateDescriptions(d, 'upscale').upscale; });
+    var model = M.buildMenuModel(dishes, menuOpts);
     var html = '';
-    CAT_ORDER.forEach(function (cat) {
-      var items = dishes.filter(function (d) { return d.category === cat; });
-      if (!items.length) return;
-      html += '<div class="menu-cat"><h3>' + cat + 's</h3>';
-      items.forEach(function (d) {
+    model.forEach(function (cat) {
+      html += '<div class="menu-cat"><h3>' + esc(cat.label) + '</h3>';
+      cat.items.forEach(function (d) {
         html += '<div class="menu-item"><div><div class="nm">' + esc(d.name) + '</div>' +
-          '<div class="ds">' + esc(descs[d.id]) + '</div></div>' +
-          '<div class="pr">' + money(d.price) + '</div></div>';
+          (d.description ? '<div class="ds">' + esc(d.description) + '</div>' : '') +
+          (d.allergens.length ? '<div class="alg-row">' + d.allergens.map(function (a) {
+            return '<span class="alg">' + esc(a) + '</span>';
+          }).join('') + '</div>' : '') +
+          '</div>' +
+          '<div class="pr">' + (d.price === null ? '' : money(d.price)) + '</div></div>';
       });
       html += '</div>';
     });
@@ -237,6 +290,15 @@
   }
   document.getElementById('bizName').addEventListener('input', renderMenu);
   document.getElementById('printMenu').addEventListener('click', function () { window.print(); });
+  document.getElementById('menuVoice').addEventListener('change', function (e) {
+    menuOpts.voice = e.target.value; renderMenu();
+  });
+  document.getElementById('menuPrices').addEventListener('change', function (e) {
+    menuOpts.showPrices = e.target.checked; renderMenu();
+  });
+  document.getElementById('menuAllergens').addEventListener('change', function (e) {
+    menuOpts.showAllergens = e.target.checked; renderMenu();
+  });
 
   // ---------- specials ----------
   document.getElementById('genSpecials').addEventListener('click', function () {
@@ -257,4 +319,5 @@
   });
 
   renderList();
+  refreshIngLibrary();
 })();

@@ -84,17 +84,55 @@ if (byName.join('|') !== 'Mid Dish|Poor Dish|Rich Dish') { console.error('name s
 var byNew = M.sortDishes(arr, 'newest');
 if (byNew[0] !== mid || byNew[2] !== rich) { console.error('newest sort'); process.exit(1); }
 if (arr.join('|') !== snap.join('|')) { console.error('sort mutated'); process.exit(1); }
-// menuToCSV: header + rows with margin columns
+// menuToCSV: header + rows with margin + allergen columns
 var csv = M.menuToCSV([rich, poor]);
 var lines = csv.split('\n');
-if (lines[0] !== 'name,category,cost,price,margin_pct,target_margin_pct,status') { console.error('csv header: ' + lines[0]); process.exit(1); }
+if (lines[0] !== 'name,category,cost,price,margin_pct,target_margin_pct,status,allergens') { console.error('csv header: ' + lines[0]); process.exit(1); }
 if (lines.length !== 3 || lines[1].indexOf('Rich Dish,main,1.00,20.00,95,70,green') !== 0) { console.error('csv rows: ' + lines[1]); process.exit(1); }
+var algDish = { name: 'A', category: 'main', price: 10, targetMargin: 70, ingredients: [], allergens: ['milk', 'peanut'] };
+var csvA = M.menuToCSV([algDish]).split('\n');
+if (csvA[1].indexOf('Milk / dairy; Peanuts') < 0) { console.error('csv allergen col: ' + csvA[1]); process.exit(1); }
 console.log('dish-management logic checks ok');
 " && ok "logic: duplicate/search/sort/csv" || bad "dish-management logic checks"
 
-for id in dishSearch dishCatFilter dishSort dishCsvBtn cancelEdit; do
+for id in dishSearch dishCatFilter dishSort dishCsvBtn cancelEdit menuVoice menuPrices menuAllergens ingLib mAllergens; do
   grep -q "id=\"$id\"" index.html && ok "index.html has id=$id" || bad "index.html missing id=$id"
 done
+
+node -e "
+var M = require('./lib/logic.js');
+// allergens: sanitize unknown ids, dedupe
+var d = { name: 'Pasta', allergens: ['milk', 'bogus', 'milk'] };
+if (M.dishAllergens(d).join('|') !== 'milk') { console.error('dishAllergens sanitize: ' + JSON.stringify(M.dishAllergens(d))); process.exit(1); }
+if (M.allergenLabel('peanut') !== 'Peanuts') { console.error('allergenLabel'); process.exit(1); }
+var d2 = { name: 'X' };
+M.setDishAllergens(d2, ['soy', 'sesame', 'nope']);
+if (d2.allergens.join('|') !== 'soy|sesame') { console.error('setDishAllergens: ' + JSON.stringify(d2.allergens)); process.exit(1); }
+if (M.MAJOR_ALLERGENS.length !== 9) { console.error('allergen count'); process.exit(1); }
+// ingredient library: last-used cost wins, trims, skips blanks
+var lib = M.ingredientLibrary([
+  { ingredients: [{ name: 'Tomato', cost: 0.5 }, { name: ' ', cost: 9 }] },
+  { ingredients: [{ name: 'tomato', cost: 0.75 }] }
+]);
+if (Object.keys(lib).length !== 1) { console.error('lib keys'); process.exit(1); }
+if (lib['tomato'].cost !== 0.75) { console.error('lib last cost: ' + lib['tomato'].cost); process.exit(1); }
+// buildMenuModel: category order/labels, voice none, prices off, allergens on/off
+var menu = [
+  { id: 'd1', name: 'Soup', category: 'starter', price: 8, ingredients: [], allergens: ['wheat'] },
+  { id: 'd2', name: 'Steak', category: 'main', price: 28, ingredients: [] }
+];
+var m1 = M.buildMenuModel(menu, { voice: 'upscale', showPrices: true, showAllergens: true });
+if (m1.length !== 2 || m1[0].label !== 'Starters' || m1[1].label !== 'Mains') { console.error('menu model cats'); process.exit(1); }
+if (!m1[0].items[0].description || m1[0].items[0].description.length < 20) { console.error('menu desc'); process.exit(1); }
+if (m1[0].items[0].allergens.join('|') !== 'Wheat / gluten') { console.error('menu allergens'); process.exit(1); }
+var m2 = M.buildMenuModel(menu, { voice: 'none', showPrices: false, showAllergens: false });
+if (m2[1].items[0].description !== null) { console.error('voice none'); process.exit(1); }
+if (m2[1].items[0].price !== null) { console.error('prices off'); process.exit(1); }
+if (m2[0].items[0].allergens.length !== 0) { console.error('allergens off'); process.exit(1); }
+// buildMenuModel never crashes on empty
+if (M.buildMenuModel([], {}).length !== 0) { console.error('empty menu model'); process.exit(1); }
+console.log('allergen + pantry + menu-model checks ok');
+" && ok "logic: allergens/pantry/menu-model" || bad "allergen/pantry/menu-model checks"
 
 echo "--- smoke: $PASS passed, $FAIL failed ---"
 [ "$FAIL" -eq 0 ]
