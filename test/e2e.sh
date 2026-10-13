@@ -89,7 +89,7 @@ eq(mains.length, 2, 'flow9 category filter keeps 2 mains');
 // FLOW 10: CSV export carries every dish with margin columns
 var csv = M.menuToCSV(fullMenu);
 var cl = csv.split('\n');
-eq(cl[0], 'name,category,cost,price,margin_pct,target_margin_pct,status,allergens', 'flow10 header');
+eq(cl[0], 'name,category,cost,price,margin_pct,target_margin_pct,status,allergens,sales_per_week', 'flow10 header');
 eq(cl.length, 5, 'flow10 one row per dish');
 t(cl[3].indexOf('Lobster Thermidor,main,17.50,24.00,27.1,70,red') === 0, 'flow10 lobster row: ' + cl[3]);
 
@@ -156,6 +156,26 @@ EOF
 for f in $(grep -o 'src="[^"]*"\|href="[^"]*"' index.html | cut -d'"' -f2 | grep -v '^http'); do
   [ -f "$f" ] && ok "asset $f" || bad "asset $f missing"
 done
+
+
+# Engineering: a chef logs weekly sales and re-sorts the matrix after a reprice
+node << 'NODEEOF'
+const M = require('/home/hatch/workspace/menucraft-ai/lib/logic.js');
+const dishes = [
+  { id: 'a', name: 'Burger', category: 'main', ingredients: [{ name: 'beef', cost: 6 }], price: 15, targetMargin: 70, salesPerWeek: 80 },
+  { id: 'b', name: 'Pasta', category: 'main', ingredients: [{ name: 'pasta', cost: 2 }], price: 18, targetMargin: 70, salesPerWeek: 10 }
+];
+let e = M.menuEngineering(dishes);
+const inQ = (q, n) => e[q].some(r => r.dish.name === n);
+if (!(inQ('plowhorses', 'Burger') && inQ('puzzles', 'Pasta'))) { console.error('initial quadrants'); process.exit(1); }
+// chef reprices the burger to target -> margin becomes healthy -> burger should move to stars
+const b = dishes[0];
+const np = M.repriceToTarget(b); b.price = np;
+e = M.menuEngineering(dishes);
+if (!e.stars.some(r => r.dish.name === 'Burger')) { console.error('burger did not become a star'); process.exit(1); }
+console.log('burger repriced to $' + np.toFixed(2) + ' and moved to Stars');
+NODEEOF
+rc=$?; [ $rc -eq 0 ] && ok "e2e: reprice moves a plowhorse to Stars" || bad "e2e engineering flow (exit $rc)"
 
 echo "--- e2e: $PASS passed, $FAIL failed ---"
 [ "$FAIL" -eq 0 ]

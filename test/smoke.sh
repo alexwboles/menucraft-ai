@@ -87,7 +87,7 @@ if (arr.join('|') !== snap.join('|')) { console.error('sort mutated'); process.e
 // menuToCSV: header + rows with margin + allergen columns
 var csv = M.menuToCSV([rich, poor]);
 var lines = csv.split('\n');
-if (lines[0] !== 'name,category,cost,price,margin_pct,target_margin_pct,status,allergens') { console.error('csv header: ' + lines[0]); process.exit(1); }
+if (lines[0] !== 'name,category,cost,price,margin_pct,target_margin_pct,status,allergens,sales_per_week') { console.error('csv header: ' + lines[0]); process.exit(1); }
 if (lines.length !== 3 || lines[1].indexOf('Rich Dish,main,1.00,20.00,95,70,green') !== 0) { console.error('csv rows: ' + lines[1]); process.exit(1); }
 var algDish = { name: 'A', category: 'main', price: 10, targetMargin: 70, ingredients: [], allergens: ['milk', 'peanut'] };
 var csvA = M.menuToCSV([algDish]).split('\n');
@@ -174,6 +174,43 @@ for id in view-report reportBody dishImportBtn dishImportFile; do
   grep -q "id=\"$id\"" index.html && ok "index.html has #$id" || bad "index.html missing #$id"
 done
 grep -q 'data-view="report"' index.html && ok "nav has report view" || bad "nav missing report view"
+
+grep -q 'data-view="engineering"' index.html && ok "nav has engineering view" || bad "nav missing engineering view"
+grep -q 'id="engBody"' index.html && ok "engineering view body exists" || bad "engBody missing"
+grep -q 'renderEngineering' js/app.js && ok "app.js has renderEngineering" || bad "renderEngineering missing"
+grep -q 'data-sales' js/app.js && ok "app.js has sold/wk editor" || bad "sold/wk editor missing"
+grep -q 'eng-grid' css/style.css && ok "matrix CSS present" || bad "matrix CSS missing"
+
+node << 'NODEEOF'
+const M = require('/home/hatch/workspace/menucraft-ai/lib/logic.js');
+const dishes = [
+  { id: 'a', name: 'Star', category: 'main', ingredients: [{ name: 'x', cost: 2 }], price: 20, targetMargin: 70, salesPerWeek: 50 },
+  { id: 'b', name: 'Plow', category: 'main', ingredients: [{ name: 'x', cost: 9 }], price: 20, targetMargin: 70, salesPerWeek: 50 },
+  { id: 'c', name: 'Puzzle', category: 'main', ingredients: [{ name: 'x', cost: 2 }], price: 20, targetMargin: 70, salesPerWeek: 5 },
+  { id: 'd', name: 'Dog', category: 'main', ingredients: [{ name: 'x', cost: 9 }], price: 20, targetMargin: 70, salesPerWeek: 5 },
+  { id: 'e', name: 'Unpriced', category: 'main', ingredients: [{ name: 'x', cost: 2 }], price: 0, targetMargin: 70, salesPerWeek: 99 }
+];
+const e = M.menuEngineering(dishes);
+const names = (rs) => rs.map(r => r.dish.name).sort().join(',');
+if (e.empty) { console.error('should not be empty'); process.exit(1); }
+if (names(e.stars) !== 'Star' || names(e.plowhorses) !== 'Plow' ||
+    names(e.puzzles) !== 'Puzzle' || names(e.dogs) !== 'Dog') {
+  console.error('quadrants wrong: ' + JSON.stringify({ s: names(e.stars), p: names(e.plowhorses), z: names(e.puzzles), d: names(e.dogs) }));
+  process.exit(1);
+}
+if (e.unjudged !== 1) { console.error('unjudged=' + e.unjudged); process.exit(1); }
+// no sales data -> empty matrix
+const e2 = M.menuEngineering(dishes.map(d => Object.assign({}, d, { salesPerWeek: 0 })));
+if (!e2.empty) { console.error('expected empty'); process.exit(1); }
+// CSV round-trips sales_per_week
+const csv = M.menuToCSV(dishes);
+if (csv.indexOf('sales_per_week') < 0) { console.error('csv missing sales column'); process.exit(1); }
+const back = M.dishesFromCSV('name,category,price,target_margin,ingredients,allergens,sales_per_week\nX,main,20,70,x:2,,12\n');
+if (back.dishes.length !== 1 || back.dishes[0].salesPerWeek !== 12) { console.error('import sales=' + JSON.stringify(back.dishes)); process.exit(1); }
+const legacy = M.dishesFromCSV('name,category,price,target_margin,ingredients,allergens\nY,main,20,70,x:2,\n');
+if (legacy.dishes.length !== 1 || legacy.dishes[0].salesPerWeek !== 0) { console.error('legacy import'); process.exit(1); }
+NODEEOF
+rc=$?; [ $rc -eq 0 ] && ok "menuEngineering quadrants + CSV sales round-trip" || bad "menuEngineering logic (exit $rc)"
 
 echo "--- smoke: $PASS passed, $FAIL failed ---"
 [ "$FAIL" -eq 0 ]

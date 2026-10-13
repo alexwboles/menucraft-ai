@@ -24,6 +24,7 @@
       document.getElementById('view-' + b.dataset.view).classList.remove('hidden');
       if (b.dataset.view === 'menu') renderMenu();
       if (b.dataset.view === 'report') renderReport();
+      if (b.dataset.view === 'engineering') renderEngineering();
     });
   });
 
@@ -170,12 +171,16 @@
         : '';
       var row = document.createElement('div');
       row.className = 'dish-row';
+      var mbarW = Math.max(0, Math.min(100, Math.round(h.margin)));
       row.innerHTML =
         '<div><span class="dot ' + h.status + '"></span><strong>' + esc(d.name) + '</strong> ' +
         '<span class="cat">' + esc(d.category) + '</span><br>' +
         '<span class="muted small">cost ' + money(h.cost) + ' · price ' + money(d.price) + ' · margin ' + h.margin + '%</span>' +
+        '<span class="mbar ' + h.status + '"><i style="width:' + mbarW + '%"></i></span>' +
         algBadges + '</div>' +
-        '<div><button class="ghost">Open</button> <button class="ghost edit">Edit</button> ' +
+        '<div class="dish-acts">' +
+        '<label class="sales-ed">sold/wk <input type="number" min="0" step="1" value="' + M.salesOf(d) + '" data-sales="' + d.id + '"></label>' +
+        '<br><button class="ghost">Open</button> <button class="ghost edit">Edit</button> ' +
         '<button class="ghost dup">Duplicate</button> <button class="ghost del">Delete</button></div>';
       row.querySelector('.ghost:not(.del):not(.edit):not(.dup)').addEventListener('click', function () { openDish(d.id); });
       row.querySelector('.edit').addEventListener('click', function () { startEdit(d.id); });
@@ -187,6 +192,11 @@
       });
       row.querySelector('.del').addEventListener('click', function () {
         if (confirm('Delete "' + d.name + '"?')) { save(load().filter(function (x) { return x.id !== d.id; })); renderList(); }
+      });
+      row.querySelector('[data-sales]').addEventListener('change', function (e) {
+        var all = load();
+        var rec = all.find(function (x) { return x.id === d.id; });
+        if (rec) { rec.salesPerWeek = Math.max(0, Math.round(parseFloat(e.target.value) || 0)); save(all); }
       });
       box.appendChild(row);
     });
@@ -275,6 +285,37 @@
       renderReport();
       alert(res.updated + ' dish' + (res.updated === 1 ? '' : 'es') + ' repriced to target margin.');
     });
+  }
+
+  // ---------- menu engineering matrix ----------
+  function renderEngineering() {
+    var dishes = load();
+    var box = document.getElementById('engBody');
+    var e = M.menuEngineering(dishes);
+    if (e.empty) {
+      box.innerHTML =
+        '<div class="eng-empty"><p><strong>The matrix needs two things:</strong> priced dishes and weekly sales.</p>' +
+        '<p class="muted small">Every dish needs a price above its plate cost, and at least one dish needs a "sold/wk" number. ' +
+        'Add those on the Dishes tab, then come back — we\u2019ll sort the menu into Stars, Plowhorses, Puzzles and Dogs.</p></div>';
+      return;
+    }
+    function chip(r) {
+      return '<div class="quad-chip"><span class="dot ' + r.status + '"></span><strong>' + esc(r.dish.name) + '</strong>' +
+        '<span class="muted small">' + r.margin + '% margin · ' + r.sales + '/wk</span></div>';
+    }
+    var html = '<p class="eng-note">Popularity line: ' + e.medianSales + ' sold/wk (median). ' +
+      e.dishCount + ' priced dishes judged' +
+      (e.unjudged ? ', ' + e.unjudged + ' skipped (no price or no cost)' : '') + '.</p>' +
+      '<div class="eng-grid">';
+    ['stars', 'plowhorses', 'puzzles', 'dogs'].forEach(function (key) {
+      var pb = M.ENG_PLAYBOOKS[key];
+      html += '<div class="quad q-' + key + '"><div class="quad-head"><span class="quad-count">' +
+        e[key].length + '</span><h3>' + pb.title + '</h3></div>' +
+        '<p class="quad-advice">' + esc(pb.advice) + '</p>' +
+        (e[key].length ? '<div class="quad-dishes">' + e[key].map(chip).join('') + '</div>'
+          : '<p class="muted small">None in this quadrant.</p>') + '</div>';
+    });
+    box.innerHTML = html + '</div>';
   }
 
   // ---------- dish modal ----------
