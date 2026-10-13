@@ -12,6 +12,7 @@
   <nav>
     <button data-view="dishes" class="active">Dishes</button>
     <button data-view="menu">Menu preview</button>
+    <button data-view="report">Menu report</button>
     <button data-view="specials">Weekend specials</button>
   </nav>
 </header>
@@ -75,6 +76,8 @@
             <option value="name">Name A–Z</option>
           </select>
           <button id="dishCsvBtn" class="ghost">Export CSV</button>
+          <button id="dishImportBtn" class="ghost">Import CSV</button>
+          <input id="dishImportFile" type="file" accept=".csv,text/csv" style="display:none" aria-hidden="true">
         </div>
         <div id="dishList" class="dish-list"><p class="muted">No dishes yet — add your first above.</p></div>
       </div>
@@ -106,6 +109,16 @@
       <div class="menu-actions no-print">
         <button id="printMenu" class="primary">Print menu</button>
       </div>
+    </div>
+  </section>
+
+  <!-- REPORT VIEW -->
+  <section id="view-report" class="view hidden">
+    <div class="card">
+      <p class="kicker">The numbers</p>
+      <h2>Menu health report</h2>
+      <p class="muted">Average margin, the winners, and the dishes quietly losing money — across your whole menu.</p>
+      <div id="reportBody"></div>
     </div>
   </section>
 

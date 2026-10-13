@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# smoke.sh — 16 quick checks for menucraft-ai
+# smoke.sh — 36 quick checks for menucraft-ai
 set -u
 cd "$(dirname "$0")/.."
 PASS=0; FAIL=0
@@ -133,6 +133,47 @@ if (m2[0].items[0].allergens.length !== 0) { console.error('allergens off'); pro
 if (M.buildMenuModel([], {}).length !== 0) { console.error('empty menu model'); process.exit(1); }
 console.log('allergen + pantry + menu-model checks ok');
 " && ok "logic: allergens/pantry/menu-model" || bad "allergen/pantry/menu-model checks"
+
+node -e "
+var M = require('./lib/logic.js');
+// menuReport: mix counts, best/worst, unpriced handling
+var dishes = [
+  { id:'d1', name:'Steak', category:'main', price:32, targetMargin:70, ingredients:[{name:'ribeye',cost:9}] },
+  { id:'d2', name:'Salad', category:'starter', price:9, targetMargin:70, ingredients:[{name:'greens',cost:1.2}] },
+  { id:'d3', name:'Soup', category:'starter', price:0, targetMargin:70, ingredients:[{name:'stock',cost:0.8}] }
+];
+var r = M.menuReport(dishes);
+if (r.dishes !== 3 || r.priced !== 2 || r.unpriced !== 1) { console.error('counts '+JSON.stringify(r)); process.exit(1); }
+if (r.best[0].name !== 'Salad' || r.worst[0].name !== 'Steak') { console.error('ranking'); process.exit(1); }
+if (typeof r.avgMargin !== 'number') { console.error('avgMargin'); process.exit(1); }
+if (M.menuReport([]).avgMargin !== null) { console.error('empty report'); process.exit(1); }
+// repriceToTarget + repriceMenu
+var cheap = { id:'d4', name:'Burger', category:'main', price:10, targetMargin:70, ingredients:[{name:'beef',cost:4}] };
+var np = M.repriceToTarget(cheap);
+if (cheap.price !== np || np !== M.suggestPrice(4, 70)) { console.error('reprice '+np); process.exit(1); }
+var res = M.repriceMenu(dishes.concat([cheap]));
+if (res.updated < 1) { console.error('bulk reprice'); process.exit(1); }
+try { M.repriceToTarget(null); console.error('should throw'); process.exit(1); } catch (e) {}
+// dishesFromCSV: header + quoted fields + blank rows
+var csv = 'name,category,price,target_margin,ingredients,allergens\n\"Margherita Pizza\",main,14.99,70,\"flour:0.80;tomato:1.20\",\"milk;wheat\"\n\nFries,side,4.50,,\"potato:0.60\",\n';
+var imp = M.dishesFromCSV(csv);
+if (imp.dishes.length !== 2 || imp.skipped !== 1) { console.error('import '+JSON.stringify(imp)); process.exit(1); }
+var pz = imp.dishes[0];
+if (pz.ingredients.length !== 2 || pz.allergens.join(',') !== 'milk,wheat' || pz.category !== 'main') { console.error('pizza '+JSON.stringify(pz)); process.exit(1); }
+if (imp.dishes[1].targetMargin !== 70) { console.error('default margin'); process.exit(1); }
+var plain = M.dishesFromCSV('Taco\nBurrito\n');
+if (plain.dishes.length !== 2 || plain.dishes[0].category !== 'main') { console.error('plain import'); process.exit(1); }
+console.log('report + reprice + import checks ok');
+" && ok "logic: menuReport/repriceToTarget/repriceMenu/dishesFromCSV" || bad "report/reprice/import checks"
+
+# new UI wiring present
+for needle in renderReport repriceAllBtn useSuggested dishImportBtn dishImportFile menuReport repriceMenu dishesFromCSV; do
+  grep -q "$needle" js/app.js && ok "app.js wires $needle" || bad "app.js missing $needle"
+done
+for id in view-report reportBody dishImportBtn dishImportFile; do
+  grep -q "id=\"$id\"" index.html && ok "index.html has #$id" || bad "index.html missing #$id"
+done
+grep -q 'data-view="report"' index.html && ok "nav has report view" || bad "nav missing report view"
 
 echo "--- smoke: $PASS passed, $FAIL failed ---"
 [ "$FAIL" -eq 0 ]

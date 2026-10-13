@@ -23,6 +23,7 @@
       document.querySelectorAll('.view').forEach(function (v) { v.classList.add('hidden'); });
       document.getElementById('view-' + b.dataset.view).classList.remove('hidden');
       if (b.dataset.view === 'menu') renderMenu();
+      if (b.dataset.view === 'report') renderReport();
     });
   });
 
@@ -208,6 +209,73 @@
     if (!dishes.length) { alert('No dishes to export yet.'); return; }
     downloadFile('menucraft-menu.csv', M.menuToCSV(dishes), 'text/csv;charset=utf-8');
   });
+  document.getElementById('dishImportBtn').addEventListener('click', function () {
+    document.getElementById('dishImportFile').click();
+  });
+  document.getElementById('dishImportFile').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var res = M.dishesFromCSV(reader.result);
+        if (!res.dishes.length) { alert('No dishes found in that file.'); return; }
+        var dishes = load();
+        res.dishes.forEach(function (d) { dishes.push(d); });
+        save(dishes);
+        renderList();
+        refreshIngLibrary();
+        alert('Imported ' + res.dishes.length + ' dish' + (res.dishes.length === 1 ? '' : 'es') +
+          (res.skipped ? ' (' + res.skipped + ' blank rows skipped)' : '') + '.');
+      } catch (err) {
+        alert('Could not import that file.');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- menu health report ----------
+  function renderReport() {
+    var dishes = load();
+    var box = document.getElementById('reportBody');
+    if (!dishes.length) { box.innerHTML = '<p class="muted">Add dishes to see your menu report.</p>'; return; }
+    var r = M.menuReport(dishes);
+    function row(d) {
+      return '<div class="rep-row"><span class="dot ' + d.status + '"></span>' +
+        '<span class="rep-name">' + esc(d.name) + ' <span class="cat">' + esc(d.category) + '</span></span>' +
+        '<span class="rep-num">cost ' + money(d.cost) + ' · price ' + money(d.price) + '</span>' +
+        '<strong class="rep-margin ' + d.status + '">' + d.margin + '%</strong></div>';
+    }
+    var mixBar = ['green', 'yellow', 'red'].map(function (s) {
+      return '<span class="mix ' + s + '">' + r.mix[s] + ' ' + s + '</span>';
+    }).join(' ');
+    box.innerHTML =
+      '<div class="rep-stats">' +
+      '<div class="rep-stat"><span class="num">' + r.dishes + '</span><span class="lbl">dishes</span></div>' +
+      '<div class="rep-stat"><span class="num">' + (r.avgMargin == null ? '—' : r.avgMargin + '%') + '</span><span class="lbl">avg margin</span></div>' +
+      '<div class="rep-stat"><span class="num">' + r.unpriced + '</span><span class="lbl">unpriced</span></div>' +
+      '</div>' +
+      '<p class="rep-mix">Margin mix: ' + mixBar + '</p>' +
+      (r.best.length ? '<h3>Best margins</h3><div class="rep-list">' + r.best.map(row).join('') + '</div>' : '') +
+      (r.worst.length ? '<h3>Needs attention</h3><div class="rep-list">' + r.worst.map(row).join('') + '</div>' : '') +
+      (r.belowTarget.length
+        ? '<div class="rep-cta"><p><strong>' + r.belowTarget.length + '</strong> dish' +
+          (r.belowTarget.length === 1 ? ' is' : 'es are') + ' losing money against target. ' +
+          'Reprice them all to their target margin in one click:</p>' +
+          '<button id="repriceAllBtn" class="primary">Price all to target margin</button></div>'
+        : '<p class="rep-ok">Every priced dish meets its target margin. Nice.</p>');
+    var btn = document.getElementById('repriceAllBtn');
+    if (btn) btn.addEventListener('click', function () {
+      var all = load();
+      var res = M.repriceMenu(all);
+      save(all);
+      renderList();
+      refreshIngLibrary();
+      renderReport();
+      alert(res.updated + ' dish' + (res.updated === 1 ? '' : 'es') + ' repriced to target margin.');
+    });
+  }
 
   // ---------- dish modal ----------
   var modal = document.getElementById('modal');
@@ -223,7 +291,21 @@
     var suggested = M.suggestPrice(cost, tm);
     document.getElementById('mCost').innerHTML =
       '<p>Plate cost: <strong>' + money(cost) + '</strong> · Your price: <strong>' + money(d.price) + '</strong><br>' +
-      '<span class="muted">Suggested price at ' + tm + '% margin: <strong>' + money(suggested) + '</strong></span></p>';
+      '<span class="muted">Suggested price at ' + tm + '% margin: <strong>' + money(suggested) + '</strong></span> ' +
+      (cost > 0 && suggested !== d.price
+        ? '<button id="useSuggested" class="ghost small" style="margin-left:8px">Use suggested price</button>'
+        : '') + '</p>';
+    var useBtn = document.getElementById('useSuggested');
+    if (useBtn) useBtn.addEventListener('click', function () {
+      var all = load();
+      var rec = all.find(function (x) { return x.id === id; });
+      if (rec) {
+        var np = M.repriceToTarget(rec);
+        save(all);
+        renderList();
+        openDish(id); // refresh the modal with the new price
+      }
+    });
     var descs = M.generateDescriptions(d);
     var dbox = document.getElementById('mDesc');
     dbox.innerHTML = '';

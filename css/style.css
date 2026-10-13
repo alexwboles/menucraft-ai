@@ -298,3 +298,28 @@ button{font:inherit;cursor:pointer}
 .menu-controls select{margin-left:6px;padding:6px 10px;border:1px solid var(--input-line);border-radius:0;font:inherit}
 .menu-controls .chk{display:inline-flex;align-items:center;gap:6px;font-weight:600}
 .menu-controls .chk input{width:auto;margin:0}
+
+/* ---------- menu health report (sharp-edged) ---------- */
+.rep-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+.rep-stat { background: var(--paper); border: 1px solid var(--line); padding: 16px; text-align: center; border-radius: 0; }
+.rep-stat .num { display: block; font-size: 28px; font-weight: 800; color: var(--ink); }
+.rep-stat .lbl { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.rep-mix { font-size: 14.5px; color: var(--body); margin: 0 0 6px; }
+.mix { display: inline-block; padding: 3px 12px; font-size: 13px; font-weight: 700; border-radius: 0; margin-right: 6px; }
+.mix.green { background: var(--green-bg); color: var(--green); }
+.mix.yellow { background: var(--yellow-bg); color: var(--yellow); }
+.mix.red { background: var(--red-bg); color: var(--red); }
+.rep-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.rep-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 0; }
+.rep-name { flex: 1; font-weight: 600; color: var(--ink); }
+.rep-num { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.rep-margin { font-size: 17px; min-width: 64px; text-align: right; }
+.rep-margin.green { color: var(--green); }
+.rep-margin.yellow { color: var(--yellow); }
+.rep-margin.red { color: var(--red); }
+.rep-cta { margin-top: 18px; padding: 16px 18px; background: var(--red-bg);
+  border: 1px solid var(--red); border-radius: 0; }
+.rep-cta p { margin: 0 0 12px; color: var(--body); }
+.rep-ok { margin-top: 14px; padding: 14px 18px; background: var(--green-bg);
+  border: 1px solid var(--green); border-radius: 0; color: var(--green); font-weight: 600; }

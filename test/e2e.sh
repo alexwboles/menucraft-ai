@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# e2e.sh — 11 end-to-end flows through menucraft-ai core logic (the same code the UI runs)
+# e2e.sh — 14 end-to-end flows through menucraft-ai core logic (the same code the UI runs)
 set -u
 cd "$(dirname "$0")/.."
 PASS=0; FAIL=0
@@ -101,8 +101,54 @@ edited.name = rec.name; edited.price = rec.price; edited.targetMargin = rec.targ
 eq(edited.id, 'd_edit11', 'flow11 id preserved on edit');
 eq(M.marginHealth(edited, edited.price, edited.targetMargin).target, 65, 'flow11 target margin updated');
 
+// FLOW 12: menu health report — margin mix, best/worst, unpriced handling
+var rmenu = [
+  { id:'r1', name:'Ribeye', category:'main', price:34, targetMargin:70, ingredients:[{name:'steak',cost:10}] },
+  { id:'r2', name:'House Salad', category:'starter', price:11, targetMargin:70, ingredients:[{name:'greens',cost:1.5}] },
+  { id:'r3', name:'Daily Soup', category:'starter', price:6, targetMargin:70, ingredients:[{name:'veg',cost:2.6}] },
+  { id:'r4', name:'Secret Dish', category:'main', price:0, targetMargin:70, ingredients:[{name:'x',cost:3}] }
+];
+var rep = M.menuReport(rmenu);
+eq(rep.dishes, 4, 'flow12 dish count');
+eq(rep.priced, 3, 'flow12 priced count');
+eq(rep.unpriced, 1, 'flow12 unpriced count');
+t(rep.mix.green + rep.mix.yellow + rep.mix.red === 3, 'flow12 mix sums to priced');
+t(rep.best[0].margin >= rep.best[rep.best.length-1].margin, 'flow12 best sorted desc');
+t(rep.worst[0].margin <= rep.worst[rep.worst.length-1].margin, 'flow12 worst sorted asc');
+t(rep.belowTarget.every(function(x){ return x.status === 'red'; }), 'flow12 belowTarget all red');
+
+// FLOW 13: reprice journey — one dish, then the whole menu
+var cheap = { id:'c1', name:'Burger', category:'main', price:9, targetMargin:70,
+  ingredients:[{name:'beef',cost:3.8},{name:'bun',cost:0.7}] };
+var before = cheap.price;
+var np = M.repriceToTarget(cheap);
+t(np > before, 'flow13 reprice raises underpriced dish');
+eq(np, M.suggestPrice(4.5, 70), 'flow13 reprice equals suggested price');
+t(M.marginHealth(cheap, cheap.price, 70).status === 'green', 'flow13 margin green after reprice');
+var menu2 = rmenu.map(function(d){ return JSON.parse(JSON.stringify(d)); });
+var res2 = M.repriceMenu(menu2);
+t(res2.updated >= 1, 'flow13 bulk reprice updates losers');
+t(menu2.every(function(d){ return M.marginHealth(d, d.price, d.targetMargin || 70).status === 'green' || !(d.price > 0); }),
+  'flow13 every priced dish green after bulk reprice');
+
+// FLOW 14: CSV import journey — a spreadsheet becomes dishes
+var sheet = 'name,category,price,target_margin,ingredients,allergens\n' +
+  '"Truffle Pasta",main,24.00,72,"pasta:1.10;truffle:6.00;cream:0.90","milk;wheat"\n' +
+  'Gelato,dessert,7.50,,"milk:0.80;sugar:0.20",milk\n';
+var imp = M.dishesFromCSV(sheet);
+eq(imp.dishes.length, 2, 'flow14 two dishes imported');
+eq(imp.skipped, 0, 'flow14 nothing skipped');
+var tp = imp.dishes[0];
+eq(tp.category, 'main', 'flow14 category kept');
+t(tp.allergens.indexOf('milk') >= 0 && tp.allergens.indexOf('wheat') >= 0, 'flow14 allergens parsed');
+eq(tp.ingredients.length, 3, 'flow14 ingredient pairs parsed');
+eq(M.computePlateCost(tp), 8.0, 'flow14 plate cost from import');
+eq(imp.dishes[1].targetMargin, 70, 'flow14 default target margin');
+var csvOut = M.menuToCSV(imp.dishes);
+t(csvOut.indexOf('Truffle Pasta') >= 0 && csvOut.split('\n').length === 3, 'flow14 imported dishes export back to CSV');
+
 if (fails.length) { fails.forEach(function (f) { console.error('FAIL: ' + f); }); process.exit(1); }
-console.log('all 11 flows green');
+console.log('all 14 flows green');
 EOF
 [ $? -eq 0 ] && ok "11 e2e flows" || bad "e2e flows"
 
